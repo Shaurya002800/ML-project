@@ -23,7 +23,6 @@ demo = gr.ChatInterface(
         "How to improve soil fertility naturally?",
         "What are the symptoms of rice blast disease?"
     ],
-    theme=gr.themes.Soft()
 )
 
 if __name__ == "__main__":
