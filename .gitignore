@@ -1,0 +1,50 @@
+# Environment variables (SECRETS)
+
+.env
+.env.*
+
+# Python cache
+
+**pycache**/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+
+venv/
+env/
+.venv/
+
+# Jupyter notebook checkpoints
+
+.ipynb_checkpoints/
+
+# OS files
+
+.DS_Store
+Thumbs.db
+
+# Logs
+
+*.log
+
+# Large ML files
+# Ignore only large/binary model artifacts, not the models/ folder so code can be tracked
+models/*.h5
+models/*.pt
+models/*.pth
+models/*.pkl
+models/*.joblib
+
+# Dataset files
+# Ignore raw and processed datasets and common large table formats, but allow small knowledge files
+data/raw/
+data/processed/
+*.csv
+*.xlsx
+
+# IDE settings
+
+.vscode/
+.idea/
