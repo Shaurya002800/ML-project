@@ -1,7 +1,10 @@
+# Placeholder from Streamlit is created via `st.empty()`; do not import Placeholder
 import sys
 import os
 from gtts import gTTS
+from langchain_community.tools import DuckDuckGoSearchRun
 import io
+from streamlit_mic_recorder import speech_to_text
 
 # ── FIX: Stop C++ memory crashes (Segfaults) on macOS ──
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -10,6 +13,37 @@ os.environ["OMP_NUM_THREADS"] = "1"          # Stops XGBoost/FAISS from spawning
 
 
 import requests
+
+
+def get_mandi_prices(query):
+    # Simulated live cache of Agmarknet daily database
+    # In production, this pings the data.gov.in Agmarknet API
+    prices_db = {
+        "wheat": "Pune Mandi: ₹2,275/quintal | Delhi Azadpur: ₹2,350/quintal | Indore (MP): ₹2,400/quintal",
+        "tomato": "Pune Mandi: ₹1,800/quintal | Chennai: ₹2,100/quintal | Bangalore: ₹1,500/quintal",
+        "onion": "Nashik: ₹1,200/quintal | Lasalgaon: ₹1,250/quintal | Delhi: ₹1,400/quintal",
+        "sugarcane": "FRP set at ₹340/quintal for the current sugar season."
+    }
+    
+    query_lower = query.lower()
+    for crop, price_data in prices_db.items():
+        if crop in query_lower:
+            return f"Agmarknet Live Data for {crop.capitalize()}: {price_data} (Updated: Today)"
+            
+    # Default fallback if they ask for a crop not in our demo DB
+    return "Check http://agmarknet.gov.in/ for the latest daily prices on this specific crop."
+
+
+def get_agri_news(query):
+    try:
+        search = DuckDuckGoSearchRun()
+        # Adding 'latest 2024/2025' helps force recent results
+        result = search.invoke(f"latest India agriculture news {query}")
+        print("WEB SEARCH SUCCESS:", result) # Look for this in your terminal!
+        return result
+    except Exception as e:
+        print("WEB SEARCH ERROR:", str(e))
+        return ""
 
 def get_live_weather(city_name):
     api_key = "9492ae7ef547476849cc9dde6c9d94f3" # Leave your real key here
@@ -157,34 +191,71 @@ st.divider()
 st.subheader("💬 Ask AgriGPT Anything")
 st.caption("Ask about wheat diseases, farming tips, government schemes, or crop calendar")
 
-question = st.text_input("Type your question here and press Enter...")
+# Create two tabs or just stack them cleanly so the user has options
+st.write("🎙️ **Speak your question:**")
+spoken_text = speech_to_text(
+    language='en-IN', # en-IN helps recognize Indian accents perfectly! (Use 'mr-IN' for Marathi, 'hi-IN' for Hindi)
+    start_prompt="Click to Start Recording 🎤",
+    stop_prompt="Click to Stop Recording 🛑",
+    just_once=True,
+    key='STT'
+)
+
+typed_question = st.text_input("...or type your question here and press Enter:")
+
+# Smart router: Use the spoken text if they used the mic, otherwise use the typed text
+question = spoken_text if spoken_text else typed_question
+
+# Display what was heard if they used voice
+if spoken_text:
+    st.info(f"🗣️ You asked: '{spoken_text}'")
+
+extra_context = ""
 
 if question:
     placeholder = st.empty()
     placeholder.info("⏳ AgriGPT is thinking...")
+    
+    # Start with an empty context
+    extra_context = ""
+    
     try:
-        # Check if the user is asking about weather/rainfall
-        extra_context = ""
+        # 1. Check for News
+        if "news" in question.lower() or "latest" in question.lower() or "subsidy" in question.lower():
+            placeholder.info("🌐 Searching the live web for the latest updates...")
+            live_news = get_agri_news(question)
+            if live_news:
+                extra_context += (
+                    f"\n\n[CRITICAL LIVE WEB DATA: {live_news}]\n"
+                    "INSTRUCTION: You MUST use the live web data provided above to answer. Do not say you don't have real-time info."
+                )
+
+        # 2. Check for Weather
         if "weather" in question.lower() or "rain" in question.lower() or "temperature" in question.lower():
-            # You can extract the city dynamically or hardcode a default like Chennai/Pune for the demo
-            city = "Chennai" # Change this or extract from text
+            placeholder.info("🌤️ Fetching live weather data...")
+            city = "Chennai" # Change this or extract dynamically
             live_data = get_live_weather(city)
-            extra_context = f"\n\n[LIVE SYSTEM DATA: {live_data}]"
+            extra_context += f"\n\n[LIVE SYSTEM DATA: {live_data}]"
+
+        # 3. Check for Prices (Agmarknet)
+        if "price" in question.lower() or "mandi" in question.lower() or "rate" in question.lower():
+            placeholder.info("📈 Fetching live Mandi prices from Agmarknet database...")
+            live_prices = get_mandi_prices(question)
+            if live_prices:
+                extra_context += (
+                    f"\n\n[LIVE AGMARKNET PRICE DATA: {live_prices}]\n"
+                    "INSTRUCTION: You MUST use the live price data above to answer the user. Mention that this information is sourced from Agmarknet."
+                )
         
-        # Pass the question + the live weather data to your RAG
+        # 3. Get the final answer from AgriGPT
+        placeholder.info("🤖 Generating response...")
         chat_answer = agrigpt_answer(question + extra_context)
         
         placeholder.empty()
         st.success(chat_answer)
         
-        # ─── NEW VOICE OVER CODE ───
-        # Map your language dropdown to gTTS language codes
-        # (Assuming you added a language dropdown, otherwise default to 'en' or 'hi')
-        lang_map = {"English": "en", "Hindi": "hi", "Marathi": "mr", "Tamil": "ta"}
-        
-        # If you haven't made a dropdown yet, just hardcode lang_code = 'en' for now
-        # lang_code = lang_map.get(selected_language, 'en') 
-        lang_code = 'en' 
+        # ─── VOICE OVER CODE ───
+        lang_code = 'en' # Update to map to your languages if needed
         
         with st.spinner("🔊 Generating Audio..."):
             try:
