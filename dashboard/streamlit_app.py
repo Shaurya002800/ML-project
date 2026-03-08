@@ -5,6 +5,7 @@ from gtts import gTTS
 from langchain_community.tools import DuckDuckGoSearchRun
 import io
 from streamlit_mic_recorder import speech_to_text
+import streamlit as st
 
 # ── FIX: Stop C++ memory crashes (Segfaults) on macOS ──
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -161,6 +162,15 @@ st.sidebar.divider()
 st.sidebar.subheader("📸 Double Verification")
 st.sidebar.caption("Optional: Upload leaf photo to confirm VOC readings visually.")
 uploaded_leaf = st.sidebar.file_uploader("Upload Leaf Image", type=["jpg", "jpeg", "png"])
+
+
+# Replace your standard st.title with the custom CSS title
+st.markdown('<p class="title-text">🌿 Vivayu + AgriGPT Hub</p>', unsafe_allow_html=True)
+st.caption("Proactive Disease Detection & Intelligent Farm Assistant")
+st.divider()
+
+
+
 # ── Main panel ─────────────────────────────────────────
 if run:
     
