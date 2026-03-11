@@ -7,7 +7,12 @@ try:
 except Exception:
     gTTS = None
     _HAS_GTTS = False
-from langchain_community.tools import DuckDuckGoSearchRun
+try:
+    from langchain_community.tools import DuckDuckGoSearchRun
+    _HAS_DDG = True
+except Exception:
+    DuckDuckGoSearchRun = None
+    _HAS_DDG = False
 import io
 from streamlit_mic_recorder import speech_to_text
 import streamlit as st
@@ -47,6 +52,10 @@ def get_mandi_prices(query):
 
 
 def get_agri_news(query):
+    if not _HAS_DDG:
+        print("WEB SEARCH SKIPPED: langchain_community not available in this environment")
+        return ""
+
     try:
         search = DuckDuckGoSearchRun()
         # Adding 'latest 2024/2025' helps force recent results
