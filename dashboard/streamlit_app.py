@@ -1,7 +1,12 @@
 # Placeholder from Streamlit is created via `st.empty()`; do not import Placeholder
 import sys
 import os
-from gtts import gTTS
+try:
+    from gtts import gTTS
+    _HAS_GTTS = True
+except Exception:
+    gTTS = None
+    _HAS_GTTS = False
 from langchain_community.tools import DuckDuckGoSearchRun
 import io
 from streamlit_mic_recorder import speech_to_text
@@ -305,10 +310,13 @@ if question:
         
         with st.spinner("🔊 Generating Audio..."):
             try:
-                tts = gTTS(text=chat_answer, lang=lang_code, slow=False)
-                fp = io.BytesIO()
-                tts.write_to_fp(fp)
-                st.audio(fp.getvalue(), format='audio/mp3')
+                if not _HAS_GTTS:
+                    st.warning("Audio generation not available (gTTS package missing).")
+                else:
+                    tts = gTTS(text=chat_answer, lang=lang_code, slow=False)
+                    fp = io.BytesIO()
+                    tts.write_to_fp(fp)
+                    st.audio(fp.getvalue(), format='audio/mp3')
             except Exception as e:
                 st.warning("Audio generation failed. Please read the text above.")
         

@@ -1,0 +1,12 @@
+streamlit>=1.18.0
+gTTS>=2.3.0
+streamlit-mic-recorder
+langchain
+langchain-community
+sentence-transformers
+faiss-cpu
+groq
+requests
+
+# Note: Some heavy packages (faiss, sentence-transformers, groq) may increase deploy time or not be supported on Streamlit Cloud.
+# If deployment fails due to large packages, consider building vectorstore locally and committing the saved index, and remove heavy packages from requirements.
