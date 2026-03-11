@@ -220,6 +220,13 @@ if run:
     col2.metric("📊 Confidence",        f"{confidence}%")
     col3.metric("🌾 Crop",              crop)
 
+    # If the real model runtime isn't available, let the user know this is a heuristic
+    try:
+        if not _xgb_ok:
+            st.info("Note: Disease prediction used a lightweight heuristic because 'xgboost' is not available on this host. Install xgboost or prebuild model artifacts for the full trained model.")
+    except Exception:
+        pass
+
     if disease == "Healthy":
         st.success("✅ Your crop appears healthy! No disease detected.")
     else:
