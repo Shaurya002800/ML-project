@@ -138,10 +138,16 @@ except Exception:
 if not _vec_ok or not _key_ok:
     msg_parts = []
     if not _vec_ok:
-        msg_parts.append("Vectorstore missing (run build_vectorstore())")
+        msg_parts.append("Vectorstore missing — AgriGPT RAG answers will be unavailable until you build the vectorstore.")
     if not _key_ok:
-        msg_parts.append("GROQ_API_KEY not set in .env")
-    st.warning(" • ".join(msg_parts))
+        msg_parts.append("GROQ API key not found — external LLM responses will be disabled. The app will use local KB snippets as a fallback.")
+    # Use info (less alarming) and provide actionable guidance
+    st.info("\n\n".join(msg_parts))
+    with st.expander("How to enable full AgriGPT (optional)"):
+        st.write(
+            "To enable the hosted Groq LLM, set `GROQ_API_KEY=your_api_key_here` in a `.env` file at the project root or the host environment variables. "
+            "If you don't set it, the app will still run and return relevant local KB snippets when the vectorstore exists."
+        )
     # Offer a one-click builder for convenience (may be slow; runs in-process)
     if not _vec_ok:
         if st.button("Build vectorstore now (may take a while)"):
