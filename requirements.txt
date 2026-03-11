@@ -8,3 +8,5 @@ sentence-transformers
 faiss-cpu
 groq
 requests
+xgboost
+langchain-huggingface
