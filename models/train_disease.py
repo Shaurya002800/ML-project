@@ -9,7 +9,6 @@ project_root = os.path.dirname(script_dir)
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
-import xgboost as xgb
 from sklearn.metrics import accuracy_score, classification_report
 
 """
@@ -63,6 +62,16 @@ def train_and_save_model():
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
+
+    # Import xgboost lazily so importing this module at app startup
+    # won't fail on deployments that don't install xgboost.
+    try:
+        import xgboost as xgb
+    except Exception as e:
+        raise RuntimeError(
+            "xgboost is required to train the disease model but is not installed. "
+            "Install xgboost or run this on a machine that has it available."
+        ) from e
 
     model = xgb.XGBClassifier(
         n_estimators=200, max_depth=6,
