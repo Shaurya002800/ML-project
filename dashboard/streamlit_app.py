@@ -135,6 +135,19 @@ try:
 except Exception:
     _key_ok = False
 
+# Check whether the disease model runtime dependency (xgboost) is available.
+try:
+    import importlib
+    _xgb_ok = importlib.util.find_spec('xgboost') is not None
+except Exception:
+    _xgb_ok = False
+
+if not _xgb_ok:
+    st.info(
+        "Disease model runtime missing: 'xgboost' is not installed in this environment. "
+        "The VOC-based disease prediction will fail unless you either install xgboost on the host or prebuild and deploy the model artifacts from a machine that has xgboost."
+    )
+
 if not _vec_ok or not _key_ok:
     msg_parts = []
     if not _vec_ok:

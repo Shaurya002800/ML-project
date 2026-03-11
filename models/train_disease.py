@@ -96,7 +96,22 @@ def _lazy_load_artifacts():
             raise FileNotFoundError(
                 "Model artifacts not found. Run `train_and_save_model()` first to create them."
             )
-        _model = joblib.load(MODEL_PATH)
+        try:
+            _model = joblib.load(MODEL_PATH)
+        except ModuleNotFoundError as e:
+            # This happens when the saved model's class (XGBoost) is not importable
+            raise RuntimeError(
+                "The saved disease model requires 'xgboost' to be installed to load. "
+                "Install xgboost in the host environment (e.g. `pip install xgboost`) or "
+                "prebuild and deploy inference-ready artifacts on a machine with xgboost. "
+                "If you cannot install xgboost on the host, run `train_and_save_model()` on a dev machine "
+                "that has xgboost, then copy the produced files in `models/` to the host."
+            ) from e
+        except Exception as e:
+            # Other issues when unpickling
+            raise RuntimeError(f"Failed to load model artifact: {e}") from e
+
+        # Load the remaining artifacts (scalers/encoders)
         _scaler = joblib.load(SCALER_PATH)
         _crop_enc = joblib.load(ENCODER_PATH)
         _disease_enc = joblib.load(DISEASE_ENCODER_PATH)
