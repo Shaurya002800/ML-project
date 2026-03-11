@@ -12,11 +12,50 @@ project_root = os.path.dirname(script_dir)
 sys.path.insert(0, project_root)
 load_dotenv(os.path.join(project_root, ".env"))
 
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from groq import Groq
+# Guard optional/host-heavy imports so the module can be imported in
+# constrained deployment environments. If a package is missing we set the
+# symbol to None and surface a clear error only when the feature is actually
+# used at runtime.
+try:
+    from langchain_community.document_loaders import DirectoryLoader, TextLoader
+    _HAS_LC_COMM_DOC = True
+except Exception:
+    try:
+        from langchain.document_loaders import DirectoryLoader, TextLoader
+        _HAS_LC_COMM_DOC = True
+    except Exception:
+        DirectoryLoader = None
+        TextLoader = None
+        _HAS_LC_COMM_DOC = False
+
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except Exception:
+    try:
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+    except Exception:
+        RecursiveCharacterTextSplitter = None
+
+try:
+    from langchain_huggingface import HuggingFaceEmbeddings
+except Exception:
+    try:
+        from langchain.embeddings import HuggingFaceEmbeddings
+    except Exception:
+        HuggingFaceEmbeddings = None
+
+try:
+    from langchain_community.vectorstores import FAISS
+except Exception:
+    try:
+        from langchain.vectorstores import FAISS
+    except Exception:
+        FAISS = None
+
+try:
+    from groq import Groq
+except Exception:
+    Groq = None
 
 KNOWLEDGE_DIR = os.path.join(project_root, "data", "knowledge")
 VECTORSTORE_DIR = os.path.join(project_root, "models", "agri_vectorstore")
@@ -28,10 +67,32 @@ _vectorstore = None
 def get_embeddings():
     global _embeddings
     if _embeddings is None:
-        _embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
-            model_kwargs={"device": "cpu"},
-        )
+        # Prefer LangChain's HuggingFaceEmbeddings when available
+        if HuggingFaceEmbeddings is not None:
+            _embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2",
+                model_kwargs={"device": "cpu"},
+            )
+        else:
+            # Fallback: try to use sentence-transformers directly if installed
+            try:
+                from sentence_transformers import SentenceTransformer
+
+                class _STWrapper:
+                    def __init__(self, model_name="all-MiniLM-L6-v2", device="cpu"):
+                        self._m = SentenceTransformer(model_name)
+
+                    def embed_documents(self, texts):
+                        return [list(x) if hasattr(x, '__iter__') else x for x in self._m.encode(texts, convert_to_numpy=True)]
+
+                    def embed_query(self, text):
+                        return list(self._m.encode(text))
+
+                _embeddings = _STWrapper("all-MiniLM-L6-v2")
+            except Exception:
+                raise RuntimeError(
+                    "No embedding backend available. Install 'langchain_huggingface' or 'sentence-transformers'."
+                )
     return _embeddings
 
 
@@ -41,12 +102,33 @@ def get_vectorstore():
         idx = os.path.join(VECTORSTORE_DIR, "index.faiss")
         if not os.path.exists(idx):
             raise FileNotFoundError("Vectorstore not found; run build_vectorstore()")
-        _vectorstore = FAISS.load_local(VECTORSTORE_DIR, get_embeddings(), allow_dangerous_deserialization=True)
+        if FAISS is None:
+            raise RuntimeError(
+                "FAISS vectorstore backend not available. Install 'langchain_community' or 'langchain' with vectorstores support."
+            )
+        _vectorstore = FAISS.load_local(
+            VECTORSTORE_DIR, get_embeddings(), allow_dangerous_deserialization=True
+        )
     return _vectorstore
 
 
 def build_vectorstore():
-    loader = DirectoryLoader(KNOWLEDGE_DIR, glob="*.txt", loader_cls=TextLoader, loader_kwargs={"encoding": "utf-8"})
+    if not _HAS_LC_COMM_DOC or DirectoryLoader is None or TextLoader is None:
+        raise RuntimeError(
+            "Document loader backend not available. Install 'langchain_community' or 'langchain' with document_loaders support."
+        )
+    if RecursiveCharacterTextSplitter is None:
+        raise RuntimeError(
+            "Text splitter backend missing. Install 'langchain_text_splitters' or the 'langchain' package."
+        )
+    if FAISS is None:
+        raise RuntimeError(
+            "FAISS vectorstore backend not available. Install 'langchain_community' or 'langchain' with vectorstores support."
+        )
+
+    loader = DirectoryLoader(
+        KNOWLEDGE_DIR, glob="*.txt", loader_cls=TextLoader, loader_kwargs={"encoding": "utf-8"}
+    )
     docs = loader.load()
     splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=80)
     chunks = splitter.split_documents(docs)
